@@ -2,16 +2,7 @@ use std::collections::{HashMap, LinkedList};
 use serde::{Serialize, Deserialize};
 use actix_web::{get, post, put, web, App, HttpResponse, HttpServer, Responder, middleware::Logger};
 use log::debug;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct GrafanaToHookshotConfig {
-    uri: String
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-enum TransformerConfigTypes {
-    GrafanaToHookshot(GrafanaToHookshotConfig)
-}
+use rust_webhook_transformer::transformer::{Transformer, GrafanaToHookshotTranformer, TransformerConfigTypes};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct MyConfig {
@@ -74,12 +65,30 @@ async fn main() -> std::io::Result<()> {
         // TODO for every configured endpoint, create a route
         // -> https://actix.rs/docs/url-dispatch#resource-configuration
 
-        App::new()
-            .wrap(logger)
-            .app_data(config.clone())
-            .service(hook_get)
-            .service(hook_post)
-            .service(hook_put)
+        let mut app = App::new();
+
+        for (id, transformers) in config.transformers.iter() {
+            debug!("Configuring endpoint {}", id);
+            for transformer in transformers.iter() {
+                debug!("Configuring transformer {:?}", transformer);
+                match transformer {
+                    TransformerConfigTypes::GrafanaToHookshot(transformer) => {
+                        debug!("Configuring GrafanaToHookshotTransformer");
+                        match transformer.route_get() {
+                            Some(route) => {
+                                let path = "/".to_owned() + id;
+                                app = app.route(&path, route)
+                            },
+                            None => {
+                                debug!("Transformer has no GET route");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        app.wrap(logger).app_data(config.clone())
     })
     .bind(("0.0.0.0", 8080))?
     .run()
