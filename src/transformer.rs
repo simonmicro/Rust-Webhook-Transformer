@@ -36,31 +36,17 @@ impl GrafanaToHookshotTransformer {
             return Err("Only POST and PUT requests are supported".to_string());
         }
 
-        if let Ok(body) = String::from_utf8(body.to_vec()) {
-            if let Ok(body_as_json) = serde_json::from_str::<serde_json::Value>(body.as_str()) {
-                if let Some(body_as_json) = body_as_json.as_object() {
-                    if self.just_show_message {
-                        if let Some(msg) = body_as_json.get("message") {
-                            if let Some(msg) = msg.as_str() {
-                                self.submit(msg).await
-                            } else {
-                                Err("The message is not a string".to_string())
-                            }
-                        } else {
-                            Err("The body does not contain a message".to_string())
-                        }
-                    } else {
-                        // TODO
-                        Err("TODO: Implement".to_string())
-                    }
-                } else {
-                    Err("The body is not a JSON object".to_string())
-                }
-            } else {
-                Err("Failed to parse the body as JSON: ".to_string())
-            }
+        let body = String::from_utf8(body.to_vec()).map_err(|e| "Failed to parse the body as UTF-8: ".to_string() + &e.to_string())?;
+        let body = serde_json::from_str::<serde_json::Value>(body.as_str()).map_err(|e| "Failed to parse the body as JSON: ".to_string() + &e.to_string())?;
+        let body = body.as_object().ok_or("The body is not a JSON object".to_string())?;
+
+        if self.just_show_message {
+            let message = body.get("message").ok_or("The body does not contain a message".to_string())?;
+            let message = message.as_str().ok_or("The message is not a string".to_string())?;
+            self.submit(message).await
         } else {
-            Err("Failed to parse the body as UTF-8: ".to_string())
+            // TODO
+            Err("TODO: Implement".to_string())
         }
     }
 }
