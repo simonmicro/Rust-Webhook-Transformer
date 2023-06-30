@@ -7,36 +7,52 @@ use log::error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Config {
+    continue_on_error: bool,
     transformers: HashMap<String, LinkedList<TransformerConfigTypes>>
 }
 
 /// Forward the request to the transformers
 #[route("/{id}", method = "GET", method = "POST", method = "PUT")]
-async fn forward_to_transformers(config: web::Data<Config>, path: web::Path<String>, request: actix_web::HttpRequest) -> impl Responder {
+async fn forward_to_transformers(config: web::Data<Config>, path: web::Path<String>, request: actix_web::HttpRequest, body: web::Bytes) -> impl Responder {
     let id: String = path.into_inner();
     match config.get_ref().transformers.get(&id) {
         Some(transformers) => {
             let list_of_future_responses: Vec<_> = transformers.iter().map(|transformer| {
-                transformer.handle(&request)
+                transformer.handle(&request, &body)
             }).map(Box::pin).collect(); // without collect it's a lazy iterator
-            let mut ok = true;
-            let mut futs = list_of_future_responses;
-            while !futs.is_empty() {
-                match future::select_all(futs).await {
-                    (Ok(()), _index, remaining) => {
-                        futs = remaining;
+            let mut err = "".to_string(); // most recent error
+            if config.continue_on_error {
+                let mut futs = list_of_future_responses;
+                while !futs.is_empty() {
+                    match future::select_all(futs).await {
+                        (Ok(()), _index, remaining) => {
+                            futs = remaining;
+                        }
+                        (Err(_e), _index, remaining) => {
+                            error!("Error while handling tranformer for request: {:?}", _e);
+                            err = _e;
+                            futs = remaining;
+                        }
                     }
-                    (Err(_e), _index, remaining) => {
-                        error!("Error while handling tranformer for request: {:?}", _e);
-                        ok = false;
-                        futs = remaining;
+                }
+            } else {
+                let results = future::join_all(list_of_future_responses).await;
+                for result in results {
+                    match result {
+                        Ok(()) => {},
+                        Err(e) => {
+                            // If we reach this, the find_al() call aborted further processing and we can just return the error
+                            error!("Error while handling tranformer for request: {:?}", e);
+                            err = e;
+                            break;
+                        }
                     }
                 }
             }
-            if ok {
+            if err.len() == 0 {
                 return HttpResponse::Ok().body("OK");
             } else {
-                return HttpResponse::InternalServerError().body("Internal server error"); // at least one transformer failed
+                return HttpResponse::InternalServerError().body("Internal server error: ".to_string() + &err.to_string()); // at least one transformer failed
             }
         },
         None => {

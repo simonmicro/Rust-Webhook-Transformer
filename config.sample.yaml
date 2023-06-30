@@ -1,3 +1,4 @@
+continue_on_error: false # if a transformer failes, shall we continue with the rest?
 transformers:
   70c471f5-f7be-4e4e-b35d-1a2371116baf: # use "uuidgen" to generate a new UUID
     - !GrafanaToHookshot # this is a YAML tag, used to denote the transformer type
