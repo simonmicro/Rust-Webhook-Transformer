@@ -10,10 +10,10 @@ pub enum TransformerConfigTypes {
 
 impl TransformerConfigTypes {
     /// Handle the request with the transformer (resolves the enum)
-    pub async fn handle(&self, request: &HttpRequest) {
+    pub async fn handle(&self, request: &HttpRequest) -> Result<(), &str> {
         match self {
             TransformerConfigTypes::GrafanaToHookshot(inner_transformer) => {
-                inner_transformer.handle(&request).await;
+                inner_transformer.handle(&request).await
             }
         }
     }
@@ -24,7 +24,8 @@ pub struct GrafanaToHookshotTransformer {
     uri: String
 }
 impl GrafanaToHookshotTransformer {
-    async fn handle(&self, req: &HttpRequest) {
+    async fn handle(&self, req: &HttpRequest) -> Result<(), &str> {
         debug!("TODO: {} -> {:?}", self.uri, req);
+        Ok(())
     }
 }

@@ -1,7 +1,9 @@
 use std::{collections::{HashMap, LinkedList}};
 use serde::{Serialize, Deserialize};
+use futures::future;
 use actix_web::{route, web, App, HttpResponse, HttpServer, Responder, middleware::Logger};
 use rust_webhook_transformer::transformer::TransformerConfigTypes;
+use log::error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Config {
@@ -12,13 +14,34 @@ struct Config {
 #[route("/{id}", method = "GET", method = "POST", method = "PUT")]
 async fn forward_to_transformers(config: web::Data<Config>, path: web::Path<String>, request: actix_web::HttpRequest) -> impl Responder {
     let id: String = path.into_inner();
-    if config.get_ref().transformers.contains_key(&id) {
-        for transformer in config.get_ref().transformers.get(&id).unwrap().iter() {
-            transformer.handle(&request).await;
+    match config.get_ref().transformers.get(&id) {
+        Some(transformers) => {
+            let list_of_future_responses: Vec<_> = transformers.iter().map(|transformer| {
+                transformer.handle(&request)
+            }).map(Box::pin).collect(); // without collect it's a lazy iterator
+            let mut ok = true;
+            let mut futs = list_of_future_responses;
+            while !futs.is_empty() {
+                match future::select_all(futs).await {
+                    (Ok(()), _index, remaining) => {
+                        futs = remaining;
+                    }
+                    (Err(_e), _index, remaining) => {
+                        error!("Error while handling tranformer for request: {:?}", _e);
+                        ok = false;
+                        futs = remaining;
+                    }
+                }
+            }
+            if ok {
+                return HttpResponse::Ok().body("OK");
+            } else {
+                return HttpResponse::InternalServerError().body("Internal server error"); // at least one transformer failed
+            }
+        },
+        None => {
+            return HttpResponse::NotFound().body("Unknown endpoint id");
         }
-        HttpResponse::Ok().body("OK") // just return 200 OK
-    } else {
-        return HttpResponse::NotFound().body("Unknown endpoint id");
     }
 }
 
