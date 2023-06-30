@@ -4,15 +4,16 @@ use log::debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransformerConfigTypes {
+    // Note that, the enum names will be used as YAML tag names
     GrafanaToHookshot(GrafanaToHookshotTransformer)
 }
 
 impl TransformerConfigTypes {
     /// Handle the request with the transformer (resolves the enum)
-    pub fn handle(&self, request: &HttpRequest) {
+    pub async fn handle(&self, request: &HttpRequest) {
         match self {
             TransformerConfigTypes::GrafanaToHookshot(inner_transformer) => {
-                inner_transformer.handle(&request);
+                inner_transformer.handle(&request).await;
             }
         }
     }
@@ -20,10 +21,10 @@ impl TransformerConfigTypes {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrafanaToHookshotTransformer {
-    pub uri: String
+    uri: String
 }
 impl GrafanaToHookshotTransformer {
-    pub fn handle(&self, req: &HttpRequest) {
+    async fn handle(&self, req: &HttpRequest) {
         debug!("TODO: {} -> {:?}", self.uri, req);
     }
 }

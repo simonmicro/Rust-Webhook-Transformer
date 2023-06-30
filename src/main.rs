@@ -14,7 +14,7 @@ async fn forward_to_transformers(config: web::Data<Config>, path: web::Path<Stri
     let id: String = path.into_inner();
     if config.get_ref().transformers.contains_key(&id) {
         for transformer in config.get_ref().transformers.get(&id).unwrap().iter() {
-            transformer.handle(&request);
+            transformer.handle(&request).await;
         }
         HttpResponse::Ok().body("OK") // just return 200 OK
     } else {
