@@ -22,29 +22,45 @@ impl TransformerConfigTypes {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrafanaToHookshotTransformer {
-    uri: String
+    uri: String,
+    just_show_message: bool
 }
 impl GrafanaToHookshotTransformer {
+    async fn submit(&self, msg: &str) -> Result<(), String> {
+        debug!("TODO: Submit to {} -> {}", self.uri, msg);
+        Ok(())
+    }
+
     async fn handle(&self, request: &HttpRequest, body: &web::Bytes) -> Result<(), String> {
         if request.method() != "POST" && request.method() != "PUT" {
             return Err("Only POST and PUT requests are supported".to_string());
         }
-        // Parse the body as JSON
-        match String::from_utf8(body.to_vec()) {
-            Ok(body_as_string) => {
-                match serde_json::from_str::<serde_json::Value>(body_as_string.as_str()) {
-                    Ok(body_as_json) => {
-                        debug!("TODO: {} -> {:?}", self.uri, body_as_json);
-                        Ok(())
-                    },
-                    Err(e) => {
-                        Err("Failed to parse the body as JSON: ".to_string() + &e.to_string())
+
+        if let Ok(body) = String::from_utf8(body.to_vec()) {
+            if let Ok(body_as_json) = serde_json::from_str::<serde_json::Value>(body.as_str()) {
+                if let Some(body_as_json) = body_as_json.as_object() {
+                    if self.just_show_message {
+                        if let Some(msg) = body_as_json.get("message") {
+                            if let Some(msg) = msg.as_str() {
+                                self.submit(msg).await
+                            } else {
+                                Err("The message is not a string".to_string())
+                            }
+                        } else {
+                            Err("The body does not contain a message".to_string())
+                        }
+                    } else {
+                        // TODO
+                        Err("TODO: Implement".to_string())
                     }
+                } else {
+                    Err("The body is not a JSON object".to_string())
                 }
-            },
-            Err(e) => {
-                Err("Failed to parse the body as UTF-8: ".to_string() + &e.to_string())
+            } else {
+                Err("Failed to parse the body as JSON: ".to_string())
             }
+        } else {
+            Err("Failed to parse the body as UTF-8: ".to_string())
         }
     }
 }
