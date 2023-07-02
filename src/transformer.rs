@@ -92,16 +92,14 @@ impl GrafanaToHookshotTransformer {
                 
                 let alertname = labels.get("alertname").ok_or("An alert does not have a alertname in its labels".to_string())?;
                 let alertname = alertname.as_str().ok_or("An alert's alertname in its labels is not a string".to_string())?;
-                
-                let instance = labels.get("instance").ok_or("An alert does not have a instance in its labels".to_string())?;
-                let instance = instance.as_str().ok_or("An alert's instance in its labels is not a string".to_string())?;
+
+                let instance = labels.get("instance").map(|v| v.as_str()).flatten();
 
                 let annotations = alert.get("annotations").ok_or("An alert does not have annotations".to_string())?;
                 let annotations = annotations.as_object().ok_or("An alert's annotations are not an object".to_string())?;
                 
-                let summary = annotations.get("summary").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
-                
-                // TODO description optional
+                let summary = annotations.get("summary").map(|v| v.as_str()).flatten();
+                let description = annotations.get("description").map(|v| v.as_str()).flatten();
 
                 // TODO values?
 
@@ -133,7 +131,7 @@ impl GrafanaToHookshotTransformer {
 
                 // Create the alert string
                 let mut as_multiline_str = std::collections::LinkedList::new();
-                as_multiline_str.push_back(format!("{} **{}**@{}{}",
+                as_multiline_str.push_back(format!("{} **{}**{}{}",
                     match status {
                         "firing" => {"🔴"},
                         "alerting" => {"🟡"},
@@ -141,9 +139,13 @@ impl GrafanaToHookshotTransformer {
                         _ => {"⚪"}
                     },
                     alertname,
-                    instance,
+                    if instance.is_some() {format!(" at `{}`", instance.unwrap())} else {"".to_string()},
                     if summary.is_some() {format!(": {}", summary.unwrap())} else {"".to_string()}
                 ));
+                // Add description
+                if description.is_some() {
+                    as_multiline_str.push_back(description.unwrap().to_string());
+                }
                 // Add actions
                 if actions.is_some() {
                     as_multiline_str.push_back(actions.unwrap());
