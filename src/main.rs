@@ -7,7 +7,7 @@ use log::error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Config {
-    continue_on_error: bool,
+    continue_on_error: Option<bool>,
     transformers: HashMap<String, LinkedList<TransformerConfigTypes>>
 }
 
@@ -21,7 +21,7 @@ async fn forward_to_transformers(config: web::Data<Config>, path: web::Path<Stri
                 transformer.handle(&request, &body)
             }).map(Box::pin).collect(); // without collect it's a lazy iterator
             let mut err = "".to_string(); // most recent error
-            if config.continue_on_error {
+            if config.continue_on_error.unwrap_or(true) {
                 let mut futs = list_of_future_responses;
                 while !futs.is_empty() {
                     match future::select_all(futs).await {
