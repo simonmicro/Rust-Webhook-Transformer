@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, LinkedList}};
 use serde::{Serialize, Deserialize};
 use futures::future;
-use actix_web::{route, web, App, HttpResponse, HttpServer, Responder, middleware::Logger};
+use actix_web::{route, get, web, App, HttpResponse, HttpServer, Responder, middleware::Logger};
 use rust_webhook_transformer::transformer::TransformerConfigTypes;
 use log::error;
 
@@ -9,6 +9,12 @@ use log::error;
 struct Config {
     continue_on_error: Option<bool>,
     transformers: HashMap<String, LinkedList<TransformerConfigTypes>>
+}
+
+/// Health check endpoint
+#[get("/healthz")]
+async fn healthz() -> impl Responder {
+    HttpResponse::Ok().body("OK") // Well, it's not really OK, but it's not an error either
 }
 
 /// Forward the request to the transformers
@@ -78,10 +84,11 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let logger = Logger::default();
 
-        let mut app = App::new();
-        app = app.service(forward_to_transformers);
-
-        app.wrap(logger).app_data(web::Data::new(config.clone()))
+        App::new()
+            .service(healthz)
+            .service(forward_to_transformers)
+            .wrap(logger)
+            .app_data(web::Data::new(config.clone()))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
