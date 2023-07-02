@@ -106,32 +106,32 @@ impl GrafanaToHookshotTransformer {
                 let silence_url = alert.get("silenceURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
                 let panel_url = alert.get("panelURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
                 let dashboard_url = alert.get("dashboardURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
-                let actions = if dashboard_url.is_some() || panel_url.is_some() || silence_url.is_some() {
+                let actions = {
                     let mut actions = std::collections::LinkedList::new();
                     if dashboard_url.is_some() {
-                        actions.push_back(format!("[dashboard]({})", dashboard_url.unwrap()));
+                        actions.push_back(format!("<a href=\"{}\">dashboard</a>", dashboard_url.unwrap()));
                     }
                     if panel_url.is_some() {
-                        actions.push_back(format!("[panel]({})", panel_url.unwrap()));
+                        actions.push_back(format!("<a href=\"{}\">panel</a>", panel_url.unwrap()));
                     }
                     if silence_url.is_some() {
-                        actions.push_back(format!("[silence]({})", silence_url.unwrap()));
+                        actions.push_back(format!("<a href=\"{}\">silence</a>", silence_url.unwrap()));
                     }
-                    let mut actions_str = " →".to_string();
-                    for action in actions {
-                        if actions_str.len() > 0 {
-                            actions_str += " ";
+                    if actions.len() > 0 {
+                        let mut actions_str = "→ ".to_string() + &actions.front().unwrap();
+                        for line in actions.iter().skip(1) {
+                            actions_str += ", ";
+                            actions_str += line;
                         }
-                        actions_str += &action;
+                        Some(actions_str)
+                    } else {
+                        None
                     }
-                    Some(actions_str)
-                } else {
-                    None
                 };
 
                 // Create the alert string
                 let mut as_multiline_str = std::collections::LinkedList::new();
-                as_multiline_str.push_back(format!("{} **{}**{}{}",
+                as_multiline_str.push_back(format!("{} <b>{}</b>{}{}",
                     match status {
                         "firing" => {"🔴"},
                         "alerting" => {"🟡"},
@@ -139,7 +139,7 @@ impl GrafanaToHookshotTransformer {
                         _ => {"⚪"}
                     },
                     alertname,
-                    if instance.is_some() {format!(" at `{}`", instance.unwrap())} else {"".to_string()},
+                    if instance.is_some() {format!(" at <code>{}</code>", instance.unwrap())} else {"".to_string()},
                     if summary.is_some() {format!(": {}", summary.unwrap())} else {"".to_string()}
                 ));
                 // Add description
@@ -153,30 +153,31 @@ impl GrafanaToHookshotTransformer {
                 alert_list.push_back(as_multiline_str);
             }
             // Create the message (title)
-            let mut message;
+            let mut message_html = "<h3>".to_string();
             if alerts_firing == 0 {
-                message = "**All alerts are resolved**\n".to_string();
+                message_html += "✅ All alerts are resolved!";
             } else {
-                message = format!("**{} alert{} firing ({} pending, {} resolved)**\n", alerts_firing, if alerts_firing == 1 { "" } else { "s" }, alerts_alerting, alerts_resolved);
+                message_html += &format!("🚨 {} alert{} firing ({} pending, {} resolved)", alerts_firing, if alerts_firing == 1 { "" } else { "s" }, alerts_alerting, alerts_resolved);
             }
+            message_html += "</h3>";
             // Append the alerts
             for alert in alert_list {
                 if alert.len() == 0 {
                     warn!("An alert is empty?! This is a bug!");
                     continue;
                 }
-                message += "\n - ";
-                message += alert.front().unwrap();
+                message_html += "<p>";
+                message_html += alert.front().unwrap();
                 for line in alert.iter().skip(1) {
-                    message += "\n";
-                    message += line;
+                    message_html += "<br>";
+                    message_html += line;
                 }
+                message_html += "</p>";
             }
-            message += "\n\n";
             // Final message
             let message = HookshotMessage {
-                text: message,
-                html: None,
+                text: "TODO".to_string(),
+                html: Some(message_html),
                 username: None
             };
             self.submit(&message).await
