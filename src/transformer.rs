@@ -52,6 +52,8 @@ impl GrafanaToHookshotTransformer {
         }
 
         let body = String::from_utf8(body.to_vec()).map_err(|e| "Failed to parse the body as UTF-8: ".to_string() + &e.to_string())?;
+        debug!("Received body: {}", body);
+
         let body = serde_json::from_str::<serde_json::Value>(body.as_str()).map_err(|e| "Failed to parse the body as JSON: ".to_string() + &e.to_string())?;
         let body = body.as_object().ok_or("The body is not a JSON object".to_string())?;
 
