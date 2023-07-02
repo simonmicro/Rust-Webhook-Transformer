@@ -154,10 +154,12 @@ impl GrafanaToHookshotTransformer {
             }
             // Create the message (title)
             let mut message_html = "<h3>".to_string();
-            if alerts_firing == 0 {
-                message_html += "✅ All alerts are resolved!";
+            if alerts_firing > 0 {
+                message_html += &format!("🚨 {} alert{} firing ({} pending, {} resolved)", alerts_firing, if alerts_firing == 1 { " is" } else { "s are" }, alerts_alerting, alerts_resolved);
+            } else if alerts_alerting > 0 {
+                message_html += &format!("⚠️ {} alert{} pending ({} resolved)", alerts_alerting, if alerts_alerting == 1 { " is" } else { "s are" }, alerts_resolved);
             } else {
-                message_html += &format!("🚨 {} alert{} firing ({} pending, {} resolved)", alerts_firing, if alerts_firing == 1 { "" } else { "s" }, alerts_alerting, alerts_resolved);
+                message_html += "✅ All alerts are resolved!";
             }
             message_html += "</h3>";
             // Append the alerts
