@@ -153,15 +153,14 @@ impl GrafanaToHookshotTransformer {
                 alert_list.push_back(as_multiline_str);
             }
             // Create the message (title)
-            let mut message_html = "<h3>".to_string();
-            if alerts_firing > 0 {
-                message_html += &format!("🚨 {} alert{} firing ({} pending, {} resolved)", alerts_firing, if alerts_firing == 1 { " is" } else { "s are" }, alerts_alerting, alerts_resolved);
+            let title = if alerts_firing > 0 {
+                format!("🚨 {} alert{} firing ({} pending, {} resolved)", alerts_firing, if alerts_firing == 1 { " is" } else { "s are" }, alerts_alerting, alerts_resolved)
             } else if alerts_alerting > 0 {
-                message_html += &format!("⚠️ {} alert{} pending ({} resolved)", alerts_alerting, if alerts_alerting == 1 { " is" } else { "s are" }, alerts_resolved);
+                format!("⚠️ {} alert{} pending ({} resolved)", alerts_alerting, if alerts_alerting == 1 { " is" } else { "s are" }, alerts_resolved)
             } else {
-                message_html += "✅ All alerts are resolved!";
-            }
-            message_html += "</h3>";
+                "✅ All alerts are resolved!".to_string()
+            };
+            let mut message_html = format!("<h3>{}</h3>", title);
             // Append the alerts
             for alert in alert_list {
                 if alert.len() == 0 {
@@ -178,7 +177,7 @@ impl GrafanaToHookshotTransformer {
             }
             // Final message
             let message = HookshotMessage {
-                text: "TODO".to_string(),
+                text: title,
                 html: Some(message_html),
                 username: None
             };
