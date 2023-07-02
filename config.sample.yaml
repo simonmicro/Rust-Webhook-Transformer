@@ -5,5 +5,5 @@ transformers:
       just_show_message: false # this transformer can try to use more advanced processing - or just show the message (which is then customizable using Grafana itself)
       uri: https://hookshot.example.com/a
     - !GrafanaToHookshot
-      just_show_message: false
+      # just_show_message: false # default is false
       uri: https://hookshot.example.com/b
