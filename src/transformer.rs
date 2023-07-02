@@ -154,9 +154,18 @@ impl GrafanaToHookshotTransformer {
             }
             // Create the message (title)
             let title = if alerts_firing > 0 {
-                format!("🚨 {} alert{} firing ({} pending, {} resolved)", alerts_firing, if alerts_firing == 1 { " is" } else { "s are" }, alerts_alerting, alerts_resolved)
+                format!("🚨 {} alert{} firing ({}{} resolved)",
+                    alerts_firing,
+                    if alerts_firing == 1 { " is" } else { "s are" },
+                    if alerts_alerting > 0 { format!("{} pending, ", alerts_alerting) } else { "".to_string() },
+                    alerts_resolved
+                )
             } else if alerts_alerting > 0 {
-                format!("⚠️ {} alert{} pending ({} resolved)", alerts_alerting, if alerts_alerting == 1 { " is" } else { "s are" }, alerts_resolved)
+                format!("⚠️ {} alert{} pending{}...",
+                    alerts_alerting,
+                    if alerts_alerting == 1 { " is" } else { "s are" },
+                    if alerts_resolved > 0 { format!(" ({} resolved)", alerts_resolved) } else { "".to_string() }
+                )
             } else {
                 "✅ All alerts are resolved!".to_string()
             };
