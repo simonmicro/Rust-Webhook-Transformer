@@ -68,8 +68,9 @@ impl GrafanaToHookshotTransformer {
             self.submit(&message).await
         } else {
             // Count how many alerts are raised (and how many are resolved)
-            let mut raised_alerts = 0;
-            let mut resolved_alerts = 0;
+            let mut alerts_firing = 0;
+            let mut alerts_alerting = 0;
+            let mut alerts_resolved = 0;
             let mut alert_list = std::collections::LinkedList::new();
             let alerts = body.get("alerts").ok_or("The body does not contain alerts".to_string())?;
             let alerts = alerts.as_array().ok_or("The alerts are not an array".to_string())?;
@@ -78,12 +79,12 @@ impl GrafanaToHookshotTransformer {
                 let alert = alert.as_object().ok_or("An alert is not an object".to_string())?;
                 let status = alert.get("status").ok_or("An alert does not have a status".to_string())?;
                 let status = status.as_str().ok_or("An alert's status is not a string".to_string())?;
-                let is_alerting = status == "alerting";
                 // Count the alert
-                if is_alerting {
-                    raised_alerts += 1;
-                } else {
-                    resolved_alerts += 1;
+                match status {
+                    "firing" => alerts_firing += 1,
+                    "alerting" => alerts_alerting += 1,
+                    "resolved" => alerts_resolved += 1,
+                    _ => debug!("Unknown alert status: {}", status)
                 }
                 // Parse the alert further
                 let labels = alert.get("labels").ok_or("An alert does not have labels".to_string())?;
@@ -98,9 +99,14 @@ impl GrafanaToHookshotTransformer {
                 let annotations = alert.get("annotations").ok_or("An alert does not have annotations".to_string())?;
                 let annotations = annotations.as_object().ok_or("An alert's annotations are not an object".to_string())?;
                 
+                // TODO optional
                 let summary = annotations.get("summary").ok_or("An alert does not have a summary in its annotations".to_string())?;
                 let summary = summary.as_str().ok_or("An alert's alertname in its annotations is not a string".to_string())?;
                 
+                // TODO description optional
+
+                // TODO values?
+
                 let silence_url = alert.get("silenceURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
                 let panel_url = alert.get("panelURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
                 let dashboard_url = alert.get("dashboardURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
@@ -130,7 +136,12 @@ impl GrafanaToHookshotTransformer {
                 // Create the alert string
                 let mut as_multiline_str = std::collections::LinkedList::new();
                 as_multiline_str.push_back(format!("{} **{}**@{}: {}",
-                    if is_alerting {"🔴"} else {"🟢"},
+                    match status {
+                        "firing" => {"🔴"},
+                        "alerting" => {"🟡"},
+                        "resolved" => {"🟢"},
+                        _ => {"⚪"}
+                    },
                     alertname,
                     instance,
                     summary
@@ -143,10 +154,10 @@ impl GrafanaToHookshotTransformer {
             }
             // Create the message (title)
             let mut message;
-            if raised_alerts == 0 {
+            if alerts_firing == 0 {
                 message = "**All alerts are resolved**\n".to_string();
             } else {
-                message = format!("**{} alert{} raised ({} resolved)**\n", raised_alerts, if raised_alerts == 1 { "" } else { "s" }, resolved_alerts);
+                message = format!("**{} alert{} firing ({} pending, {} resolved)**\n", alerts_firing, if alerts_firing == 1 { "" } else { "s" }, alerts_alerting, alerts_resolved);
             }
             // Append the alerts
             for alert in alert_list {
