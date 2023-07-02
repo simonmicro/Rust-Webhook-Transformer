@@ -89,6 +89,9 @@ impl GrafanaToHookshotTransformer {
                 
                 let alertname = labels.get("alertname").ok_or("An alert does not have a alertname in its labels".to_string())?;
                 let alertname = alertname.as_str().ok_or("An alert's alertname in its labels is not a string".to_string())?;
+                
+                let instance = labels.get("instance").ok_or("An alert does not have a instance in its labels".to_string())?;
+                let instance = instance.as_str().ok_or("An alert's instance in its labels is not a string".to_string())?;
 
                 let annotations = alert.get("annotations").ok_or("An alert does not have annotations".to_string())?;
                 let annotations = annotations.as_object().ok_or("An alert's annotations are not an object".to_string())?;
@@ -124,9 +127,10 @@ impl GrafanaToHookshotTransformer {
 
                 // Create the alert string
                 let mut as_multiline_str = std::collections::LinkedList::new();
-                as_multiline_str.push_back(format!("{} **{}**: {}",
+                as_multiline_str.push_back(format!("{} **{}**@{}: {}",
                     if is_alerting {"🔴"} else {"🟢"},
                     alertname,
+                    instance,
                     summary
                 ));
                 // Add actions
