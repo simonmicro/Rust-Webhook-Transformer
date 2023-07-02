@@ -1,0 +1,16 @@
+build_common:
+    stage: build
+    image:
+        name: gcr.io/kaniko-project/executor:v1.9.0-debug
+        entrypoint: [""]
+    parallel:
+        matrix:
+        - REPOSITORY:
+            - github-ghcr
+            - gitlab-ci
+    script:
+        - mkdir -p /kaniko/.docker
+        # Adding both repository credentials, as this job may run for both
+        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}, \"$GHCR_REGISTRY\":{\"username\":\"$GHCR_REGISTRY_USER\",\"password\":\"$GHCR_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        - if [[ "$REPOSITORY" == "gitlab-ci" ]]; then export REGISTRY_TARGET=$CI_REGISTRY_IMAGE; else export REGISTRY_TARGET=$GHCR_REGISTRY_IMAGE; fi
+        - /kaniko/executor --cleanup --context $CI_PROJECT_DIR --destination $REGISTRY_TARGET:latest
