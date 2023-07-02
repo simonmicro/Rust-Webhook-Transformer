@@ -1,7 +1,7 @@
 use actix_web::{HttpRequest, web};
 use serde::{Serialize, Deserialize};
 use serde_json;
-use log::debug;
+use log::{debug, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransformerConfigTypes {
@@ -65,8 +65,104 @@ impl GrafanaToHookshotTransformer {
             };
             self.submit(&message).await
         } else {
-            // TODO
-            Err("TODO: Implement".to_string())
+            // Count how many alerts are raised (and how many are resolved)
+            let mut raised_alerts = 0;
+            let mut resolved_alerts = 0;
+            let mut alert_list = std::collections::LinkedList::new();
+            let alerts = body.get("alerts").ok_or("The body does not contain alerts".to_string())?;
+            let alerts = alerts.as_array().ok_or("The alerts are not an array".to_string())?;
+            for alert in alerts {
+                // Parse the alert
+                let alert = alert.as_object().ok_or("An alert is not an object".to_string())?;
+                let status = alert.get("status").ok_or("An alert does not have a status".to_string())?;
+                let status = status.as_str().ok_or("An alert's status is not a string".to_string())?;
+                let is_alerting = status == "alerting";
+                // Count the alert
+                if is_alerting {
+                    raised_alerts += 1;
+                } else {
+                    resolved_alerts += 1;
+                }
+                // Parse the alert further
+                let labels = alert.get("labels").ok_or("An alert does not have labels".to_string())?;
+                let labels = labels.as_object().ok_or("An alert's labels are not an object".to_string())?;
+                
+                let alertname = labels.get("alertname").ok_or("An alert does not have a alertname in its labels".to_string())?;
+                let alertname = alertname.as_str().ok_or("An alert's alertname in its labels is not a string".to_string())?;
+
+                let annotations = alert.get("annotations").ok_or("An alert does not have annotations".to_string())?;
+                let annotations = annotations.as_object().ok_or("An alert's annotations are not an object".to_string())?;
+                
+                let summary = annotations.get("summary").ok_or("An alert does not have a summary in its annotations".to_string())?;
+                let summary = summary.as_str().ok_or("An alert's alertname in its annotations is not a string".to_string())?;
+                
+                let silence_url = alert.get("silenceURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
+                let panel_url = alert.get("panelURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
+                let dashboard_url = alert.get("dashboardURL").map(|v| v.as_str().map(|v| if v.len() > 0 {Some(v)} else {None} ).flatten()).flatten();
+                let actions = if dashboard_url.is_some() || panel_url.is_some() || silence_url.is_some() {
+                    let mut actions = std::collections::LinkedList::new();
+                    if dashboard_url.is_some() {
+                        actions.push_back(format!("[dashboard]({})", dashboard_url.unwrap()));
+                    }
+                    if panel_url.is_some() {
+                        actions.push_back(format!("[panel]({})", panel_url.unwrap()));
+                    }
+                    if silence_url.is_some() {
+                        actions.push_back(format!("[silence]({})", silence_url.unwrap()));
+                    }
+                    let mut actions_str = " →".to_string();
+                    for action in actions {
+                        if actions_str.len() > 0 {
+                            actions_str += " ";
+                        }
+                        actions_str += &action;
+                    }
+                    Some(actions_str)
+                } else {
+                    None
+                };
+
+                // Create the alert string
+                let mut as_multiline_str = std::collections::LinkedList::new();
+                as_multiline_str.push_back(format!("{} **{}**: {}",
+                    if is_alerting {"🔴"} else {"🟢"},
+                    alertname,
+                    summary
+                ));
+                // Add actions
+                if actions.is_some() {
+                    as_multiline_str.push_back(actions.unwrap());
+                }
+                alert_list.push_back(as_multiline_str);
+            }
+            // Create the message (title)
+            let mut message;
+            if raised_alerts == 0 {
+                message = "**All alerts are resolved**\n".to_string();
+            } else {
+                message = format!("**{} alert{} raised ({} resolved)**\n", raised_alerts, if raised_alerts == 1 { "" } else { "s" }, resolved_alerts);
+            }
+            // Append the alerts
+            for alert in alert_list {
+                if alert.len() == 0 {
+                    warn!("An alert is empty?! This is a bug!");
+                    continue;
+                }
+                message += "\n - ";
+                message += alert.front().unwrap();
+                for line in alert.iter().skip(1) {
+                    message += "\n";
+                    message += line;
+                }
+            }
+            message += "\n\n";
+            // Final message
+            let message = HookshotMessage {
+                text: message,
+                html: None,
+                username: None
+            };
+            self.submit(&message).await
         }
     }
 }
