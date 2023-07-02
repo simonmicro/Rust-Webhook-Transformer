@@ -1,6 +1,6 @@
 # continue_on_error: false # (default: true) if a transformer failes, shall we continue with the rest?
 transformers:
-  70c471f5-f7be-4e4e-b35d-1a2371116baf: # use "uuidgen" to generate a new UUID
+  70c471f5-f7be-4e4e-b35d-1a2371116baf: # use "uuidgen" to generate a new UUID, this is also the endpoint -> http://localhost:8080/70c471f5-f7be-4e4e-b35d-1a2371116baf
     - !GrafanaToHookshot # this is a YAML tag, used to denote the transformer type
       just_show_message: false # this transformer can try to use more advanced processing - or just show the message (which is then customizable using Grafana itself)
       uri: https://hookshot.example.com/a
