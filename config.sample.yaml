@@ -11,3 +11,6 @@ transformers:
     - !UptimeKumaToHookshot
       just_show_message: false # this transformer can try to use more advanced processing - or just show the message
       uri: https://hookshot.example.com/c
+  0f2a79a9-4dae-44b2-8c36-b36b22a01e25:
+    - !GitlabToHookshot
+      uri: https://hookshot.example.com/d
