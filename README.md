@@ -9,6 +9,7 @@ Transform and forward webhook events from different formats:
 | Source | Destination | Notes |
 | ------ | ----------- | ----- |
 | [Grafana](https://grafana.com/) | [Hookshot](https://github.com/matrix-org/matrix-hookshot) | Supports both raw `message` forwarding, as well as a custom, more compact, representation of the alerts. Here is a sample: ![custom-format-sample](docs/grafana-to-hookshot.png) |
+| [UptimeKuma](https://github.com/louislam/uptime-kuma)<br>(`application/json`) | [Hookshot](https://github.com/matrix-org/matrix-hookshot) | Supports both raw `msg` forwarding, as well as a custom, representation of the alerts. Here is a sample: ![custom-format-sample](docs/uptimekuma-to-hookshot.png) |
 
 ## Configuration
 

@@ -7,3 +7,7 @@ transformers:
     - !GrafanaToHookshot
       # just_show_message: true # (default: false)
       uri: https://hookshot.example.com/b
+  55fbc7ca-6bba-4d2a-8c05-bd7d36d6dc08:
+    - !UptimeKumaToHookshot
+      just_show_message: false # this transformer can try to use more advanced processing - or just show the message
+      uri: https://hookshot.example.com/c

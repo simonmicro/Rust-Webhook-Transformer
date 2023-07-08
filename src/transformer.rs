@@ -6,7 +6,8 @@ use log::{debug, warn};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransformerConfigTypes {
     // Note that, the enum names will be used as YAML tag names
-    GrafanaToHookshot(GrafanaToHookshotTransformer)
+    GrafanaToHookshot(GrafanaToHookshotTransformer),
+    UptimeKumaToHookshot(UptimeKumaToHookshotTransformer)
 }
 
 impl TransformerConfigTypes {
@@ -14,6 +15,9 @@ impl TransformerConfigTypes {
     pub async fn handle(&self, request: &HttpRequest, body: &web::Bytes) -> Result<(), String> {
         match self {
             TransformerConfigTypes::GrafanaToHookshot(inner_transformer) => {
+                inner_transformer.handle(&request, &body).await
+            }
+            TransformerConfigTypes::UptimeKumaToHookshot(inner_transformer) => {
                 inner_transformer.handle(&request, &body).await
             }
         }
@@ -26,18 +30,12 @@ struct HookshotMessage {
     html: Option<String>, // if not provided, the text will be (converted and) used
     username: Option<String>, // will be prepended to the message
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GrafanaToHookshotTransformer {
-    uri: String,
-    just_show_message: Option<bool>
-}
-impl GrafanaToHookshotTransformer {
-    async fn submit(&self, msg: &HookshotMessage) -> Result<(), String> {
-        debug!("Submitting message to Hookshot (via {}): {:#?}", self.uri, msg);
+impl HookshotMessage {
+    async fn submit(&self, uri: &str) -> Result<(), String> {
+        debug!("Submitting message to Hookshot (via {}): {:#?}", uri, self);
         let client = reqwest::Client::new();
-        client.post(&self.uri)
-            .body(serde_json::to_string(msg).map_err(|e| e.to_string())?)
+        client.post(uri)
+            .body(serde_json::to_string(self).map_err(|e| e.to_string())?)
             .header("Content-Type", "application/json")
             .timeout(std::time::Duration::from_secs(10))
             .send()
@@ -45,7 +43,14 @@ impl GrafanaToHookshotTransformer {
             .map_err(|e| e.to_string())?;
         Ok(())
     }
+}
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrafanaToHookshotTransformer {
+    uri: String,
+    just_show_message: Option<bool>
+}
+impl GrafanaToHookshotTransformer {
     async fn handle(&self, request: &HttpRequest, body: &web::Bytes) -> Result<(), String> {
         if request.method() != "POST" && request.method() != "PUT" {
             return Err("Only POST and PUT requests are supported".to_string());
@@ -65,7 +70,7 @@ impl GrafanaToHookshotTransformer {
                 html: None,
                 username: None
             };
-            self.submit(&message).await
+            message.submit(&self.uri).await
         } else {
             // Count how many alerts are raised (and how many are resolved)
             let mut alerts_firing = 0;
@@ -190,7 +195,58 @@ impl GrafanaToHookshotTransformer {
                 html: Some(message_html),
                 username: None
             };
-            self.submit(&message).await
+            message.submit(&self.uri).await
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UptimeKumaToHookshotTransformer {
+    uri: String,
+    just_show_message: Option<bool>
+}
+impl UptimeKumaToHookshotTransformer {
+    async fn handle(&self, request: &HttpRequest, body: &web::Bytes) -> Result<(), String> {
+        if request.method() != "POST" {
+            return Err("Only POST requests are supported".to_string());
+        }
+
+        let body = String::from_utf8(body.to_vec()).map_err(|e| "Failed to parse the body as UTF-8: ".to_string() + &e.to_string())?;
+        debug!("Received body: {}", body);
+
+        let body = serde_json::from_str::<serde_json::Value>(body.as_str()).map_err(|e| "Failed to parse the body as JSON: ".to_string() + &e.to_string())?;
+        let body = body.as_object().ok_or("The body is not a JSON object".to_string())?;
+
+        if self.just_show_message.unwrap_or(false) {
+            let message = body.get("msg").ok_or("The body does not contain a msg".to_string())?;
+            let message = message.as_str().ok_or("The msg is not a string".to_string())?;
+            let message = HookshotMessage {
+                text: message.to_string(), // UptimeKuma not uses Markdown, but fany emojis
+                html: None,
+                username: None
+            };
+            message.submit(&self.uri).await
+        } else {
+            let heartbeat = body.get("heartbeat").ok_or("The body does not contain a heartbeat".to_string())?;
+            
+            let monitor = body.get("monitor").ok_or("The body does not contain a monitor".to_string())?;
+            let name = monitor.get("name").ok_or("The monitor does not contain a name".to_string())?;
+            let name = name.as_str().ok_or("The name is not a string".to_string())?;
+            let message = heartbeat.get("msg").ok_or("The heartbeat does not contain a msg".to_string())?;
+            let message = message.as_str().ok_or("The msg is not a string".to_string())?;
+            let is_up = monitor.get("msg").map(|v| v.as_str().map(|v| v.contains("✅"))).flatten().unwrap_or(false);
+            
+            let message_html = format!("<p>{} <b>{}</b>: {}</p>",
+                if is_up {"🟢"} else {"🔴"},
+                name,
+                message
+            );
+            let message = HookshotMessage {
+                text: message.to_string(), // UptimeKuma not uses Markdown, but fany emojis
+                html: Some(message_html),
+                username: None
+            };
+            message.submit(&self.uri).await
         }
     }
 }
