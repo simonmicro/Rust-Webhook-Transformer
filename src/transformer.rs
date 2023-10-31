@@ -341,15 +341,34 @@ impl UptimeKumaToHookshotTransformer {
             let message = message
                 .as_str()
                 .ok_or("The msg is not a string".to_string())?;
-            let is_up = monitor
-                .get("msg")
-                .map(|v| v.as_str().map(|v| v.contains("✅")))
-                .flatten()
-                .unwrap_or(false);
+            let monitor_msg = monitor.get("msg");
+            let mut is_up = None;
+            if let Some(monitor_msg) = monitor_msg {
+                let monitor_msg = monitor_msg.as_str().unwrap_or(""); // if this is not a string, treat it as empty
+                if monitor_msg.contains("[✅ ") {
+                    is_up = Some(true);
+                } else if monitor_msg.contains("[🔴 ") {
+                    is_up = Some(false);
+                } else if monitor_msg.contains("Up]") {
+                    // well, try that again with a little bit more fuzzy matching
+                    is_up = Some(true);
+                } else if monitor_msg.contains("Down]") {
+                    // well, try that again with a little bit more fuzzy matching
+                    is_up = Some(false);
+                }
+            }
 
             let message_html = format!(
                 "<p>{} <b>{}</b>: {}</p>",
-                if is_up { "🟢" } else { "🔴" },
+                if let Some(is_up) = is_up {
+                    if is_up {
+                        "🟢"
+                    } else {
+                        "🔴"
+                    }
+                } else {
+                    "⚪" // ouch, we don't know if it's up or down
+                },
                 name,
                 message
             );
