@@ -341,7 +341,7 @@ impl UptimeKumaToHookshotTransformer {
             let message = message
                 .as_str()
                 .ok_or("The msg is not a string".to_string())?;
-            let monitor_msg = monitor.get("msg");
+            let monitor_msg = body.get("msg");
             let mut is_up = None;
             if let Some(monitor_msg) = monitor_msg {
                 let monitor_msg = monitor_msg.as_str().unwrap_or(""); // if this is not a string, treat it as empty
