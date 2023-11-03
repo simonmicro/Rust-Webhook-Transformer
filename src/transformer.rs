@@ -360,14 +360,10 @@ impl UptimeKumaToHookshotTransformer {
 
             let message_html = format!(
                 "<p>{} <b>{}</b>: {}</p>",
-                if let Some(is_up) = is_up {
-                    if is_up {
-                        "🟢"
-                    } else {
-                        "🔴"
-                    }
-                } else {
-                    "⚪" // ouch, we don't know if it's up or down
+                match is_up {
+                    Some(true) => "🟢",
+                    Some(false) => "🔴",
+                    None => "⚪", // ouch, we don't know if it's up or down
                 },
                 name,
                 message
