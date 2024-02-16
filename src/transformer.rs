@@ -414,192 +414,232 @@ impl GitlabToHookshotTransformer {
             .as_object()
             .ok_or("The body is not a JSON object".to_string())?;
 
-        let object_kind = body
-            .get("object_kind")
-            .ok_or("The body does not contain an object_kind".to_string())?;
-        let object_kind = object_kind
-            .as_str()
-            .ok_or("The object_kind is not a string".to_string())?;
+        if let Some(object_kind) = body.get("object_kind") {
+            let object_kind = object_kind
+                .as_str()
+                .ok_or("The object_kind is not a string".to_string())?;
 
-        match object_kind {
-            "push" => {
-                let project = body
-                    .get("project")
-                    .ok_or("The body does not contain a project".to_string())?;
-                let project = project
-                    .as_object()
-                    .ok_or("The project is not a JSON object".to_string())?;
-                let project_name = project
-                    .get("name")
-                    .ok_or("The project does not contain a name".to_string())?;
-                let project_name = project_name
-                    .as_str()
-                    .ok_or("The name is not a string".to_string())?;
-                let project_url = project
-                    .get("web_url")
-                    .ok_or("The project does not contain a web_url".to_string())?;
-                let project_url = project_url
-                    .as_str()
-                    .ok_or("The web_url is not a string".to_string())?;
-                let user = body
-                    .get("user_name")
-                    .ok_or("The body does not contain a user_name".to_string())?;
-                let user = user
-                    .as_str()
-                    .ok_or("The user_name is not a string".to_string())?;
-                let commits = body
-                    .get("commits")
-                    .ok_or("The body does not contain a commits".to_string())?;
-                let commits = commits
-                    .as_array()
-                    .ok_or("The commits is not an array".to_string())?;
-                let message = format!(
-                    "{} pushed {} commit{} to {}",
-                    user,
-                    commits.len(),
-                    if commits.len() == 1 { "" } else { "s" },
-                    project_name
-                );
-                let mut message_html = format!(
-                    "<h3>{} pushed {} commit{} to <a href=\"{}\">{}</a></h3>",
-                    user,
-                    commits.len(),
-                    if commits.len() == 1 { "" } else { "s" },
-                    project_url,
-                    project_name
-                );
-                for commit in commits {
-                    let commit = commit
+            match object_kind {
+                "push" => {
+                    let project = body
+                        .get("project")
+                        .ok_or("The body does not contain a project".to_string())?;
+                    let project = project
                         .as_object()
-                        .ok_or("A commit is not a JSON object".to_string())?;
-                    let commit_id = commit
-                        .get("id")
-                        .ok_or("A commit does not contain an id".to_string())?;
-                    let commit_id = commit_id
+                        .ok_or("The project is not a JSON object".to_string())?;
+                    let project_name = project
+                        .get("name")
+                        .ok_or("The project does not contain a name".to_string())?;
+                    let project_name = project_name
                         .as_str()
-                        .ok_or("The id is not a string".to_string())?;
-                    let commit_url = commit
+                        .ok_or("The name is not a string".to_string())?;
+                    let project_url = project
+                        .get("web_url")
+                        .ok_or("The project does not contain a web_url".to_string())?;
+                    let project_url = project_url
+                        .as_str()
+                        .ok_or("The web_url is not a string".to_string())?;
+                    let user = body
+                        .get("user_name")
+                        .ok_or("The body does not contain a user_name".to_string())?;
+                    let user = user
+                        .as_str()
+                        .ok_or("The user_name is not a string".to_string())?;
+                    let commits = body
+                        .get("commits")
+                        .ok_or("The body does not contain a commits".to_string())?;
+                    let commits = commits
+                        .as_array()
+                        .ok_or("The commits is not an array".to_string())?;
+                    let message = format!(
+                        "{} pushed {} commit{} to {}",
+                        user,
+                        commits.len(),
+                        if commits.len() == 1 { "" } else { "s" },
+                        project_name
+                    );
+                    let mut message_html = format!(
+                        "<h3>{} pushed {} commit{} to <a href=\"{}\">{}</a></h3>",
+                        user,
+                        commits.len(),
+                        if commits.len() == 1 { "" } else { "s" },
+                        project_url,
+                        project_name
+                    );
+                    for commit in commits {
+                        let commit = commit
+                            .as_object()
+                            .ok_or("A commit is not a JSON object".to_string())?;
+                        let commit_id = commit
+                            .get("id")
+                            .ok_or("A commit does not contain an id".to_string())?;
+                        let commit_id = commit_id
+                            .as_str()
+                            .ok_or("The id is not a string".to_string())?;
+                        let commit_url = commit
+                            .get("url")
+                            .ok_or("A commit does not contain an url".to_string())?;
+                        let commit_url = commit_url
+                            .as_str()
+                            .ok_or("The url is not a string".to_string())?;
+                        let commit_message = commit
+                            .get("message")
+                            .ok_or("A commit does not contain a message".to_string())?;
+                        let commit_message = commit_message
+                            .as_str()
+                            .ok_or("The message is not a string".to_string())?;
+                        message_html += &format!(
+                            "<a href=\"{}\"><code>{}</code></a> {}<br>",
+                            commit_url,
+                            commit_id[0..8].to_string(),
+                            commit_message
+                        );
+                    }
+                    let message = HookshotMessage {
+                        text: message,
+                        html: Some(message_html),
+                        username: None,
+                    };
+                    message.submit(&self.uri).await
+                }
+                "tag_push" => {
+                    let project = body
+                        .get("project")
+                        .ok_or("The body does not contain a project".to_string())?;
+                    let project = project
+                        .as_object()
+                        .ok_or("The project is not a JSON object".to_string())?;
+                    let project_name = project
+                        .get("name")
+                        .ok_or("The project does not contain a name".to_string())?;
+                    let project_name = project_name
+                        .as_str()
+                        .ok_or("The name is not a string".to_string())?;
+                    let project_url = project
+                        .get("web_url")
+                        .ok_or("The project does not contain a web_url".to_string())?;
+                    let project_url = project_url
+                        .as_str()
+                        .ok_or("The web_url is not a string".to_string())?;
+                    let user = body
+                        .get("user_name")
+                        .ok_or("The body does not contain a user_name".to_string())?;
+                    let user = user
+                        .as_str()
+                        .ok_or("The user_name is not a string".to_string())?;
+                    let message = format!("{} pushed a tag to {}", user, project_name);
+                    let message_html = format!(
+                        "<h3>{} pushed a tag to <a href=\"{}\">{}</a></h3>",
+                        user, project_url, project_name
+                    );
+                    let message = HookshotMessage {
+                        text: message,
+                        html: Some(message_html),
+                        username: None,
+                    };
+                    message.submit(&self.uri).await
+                }
+                "pipeline" => {
+                    let project = body
+                        .get("project")
+                        .ok_or("The body does not contain a project".to_string())?;
+                    let project = project
+                        .as_object()
+                        .ok_or("The project is not a JSON object".to_string())?;
+                    let project_name = project
+                        .get("name")
+                        .ok_or("The project does not contain a name".to_string())?;
+                    let project_name = project_name
+                        .as_str()
+                        .ok_or("The name is not a string".to_string())?;
+                    let project_url = project
+                        .get("web_url")
+                        .ok_or("The project does not contain a web_url".to_string())?;
+                    let project_url = project_url
+                        .as_str()
+                        .ok_or("The web_url is not a string".to_string())?;
+                    let pipeline = body
+                        .get("object_attributes")
+                        .ok_or("The body does not contain object_attributes".to_string())?;
+                    let pipeline = pipeline
+                        .as_object()
+                        .ok_or("The object_attributes is not a JSON object".to_string())?;
+                    let pipeline_id = pipeline
+                        .get("id")
+                        .ok_or("The pipeline does not contain an id".to_string())?;
+                    let pipeline_id = pipeline_id
+                        .as_u64()
+                        .ok_or("The id is not an integer".to_string())?;
+                    let pipeline_status = pipeline
+                        .get("status")
+                        .ok_or("The pipeline does not contain a status".to_string())?;
+                    let pipeline_status = pipeline_status
+                        .as_str()
+                        .ok_or("The status is not a string".to_string())?;
+                    let pipeline_url = pipeline
                         .get("url")
-                        .ok_or("A commit does not contain an url".to_string())?;
-                    let commit_url = commit_url
+                        .ok_or("The pipeline does not contain an url".to_string())?;
+                    let pipeline_url = pipeline_url
                         .as_str()
                         .ok_or("The url is not a string".to_string())?;
-                    let commit_message = commit
-                        .get("message")
-                        .ok_or("A commit does not contain a message".to_string())?;
-                    let commit_message = commit_message
-                        .as_str()
-                        .ok_or("The message is not a string".to_string())?;
-                    message_html += &format!(
-                        "<a href=\"{}\"><code>{}</code></a> {}<br>",
-                        commit_url,
-                        commit_id[0..8].to_string(),
-                        commit_message
+                    let message = format!(
+                        "Pipeline #{} {} for {}",
+                        pipeline_id, pipeline_status, project_name
                     );
+                    let message_html = format!(
+                        "<h3>Pipeline <a href=\"{}\">#{}</a> {} for <a href=\"{}\">{}</a></h3>",
+                        pipeline_url, pipeline_id, pipeline_status, project_url, project_name
+                    );
+                    let message = HookshotMessage {
+                        text: message,
+                        html: Some(message_html),
+                        username: None,
+                    };
+                    message.submit(&self.uri).await
                 }
-                let message = HookshotMessage {
-                    text: message,
-                    html: Some(message_html),
-                    username: None,
-                };
-                message.submit(&self.uri).await
+                other => Err(format!("Unsupported object_kind: {}", other)),
             }
-            "tag_push" => {
-                let project = body
-                    .get("project")
-                    .ok_or("The body does not contain a project".to_string())?;
-                let project = project
-                    .as_object()
-                    .ok_or("The project is not a JSON object".to_string())?;
-                let project_name = project
-                    .get("name")
-                    .ok_or("The project does not contain a name".to_string())?;
-                let project_name = project_name
-                    .as_str()
-                    .ok_or("The name is not a string".to_string())?;
-                let project_url = project
-                    .get("web_url")
-                    .ok_or("The project does not contain a web_url".to_string())?;
-                let project_url = project_url
-                    .as_str()
-                    .ok_or("The web_url is not a string".to_string())?;
-                let user = body
-                    .get("user_name")
-                    .ok_or("The body does not contain a user_name".to_string())?;
-                let user = user
-                    .as_str()
-                    .ok_or("The user_name is not a string".to_string())?;
-                let message = format!("{} pushed a tag to {}", user, project_name);
-                let message_html = format!(
-                    "<h3>{} pushed a tag to <a href=\"{}\">{}</a></h3>",
-                    user, project_url, project_name
-                );
-                let message = HookshotMessage {
-                    text: message,
-                    html: Some(message_html),
-                    username: None,
-                };
-                message.submit(&self.uri).await
-            }
-            "pipeline" => {
-                let project = body
-                    .get("project")
-                    .ok_or("The body does not contain a project".to_string())?;
-                let project = project
-                    .as_object()
-                    .ok_or("The project is not a JSON object".to_string())?;
-                let project_name = project
-                    .get("name")
-                    .ok_or("The project does not contain a name".to_string())?;
-                let project_name = project_name
-                    .as_str()
-                    .ok_or("The name is not a string".to_string())?;
-                let project_url = project
-                    .get("web_url")
-                    .ok_or("The project does not contain a web_url".to_string())?;
-                let project_url = project_url
-                    .as_str()
-                    .ok_or("The web_url is not a string".to_string())?;
-                let pipeline = body
-                    .get("object_attributes")
-                    .ok_or("The body does not contain object_attributes".to_string())?;
-                let pipeline = pipeline
-                    .as_object()
-                    .ok_or("The object_attributes is not a JSON object".to_string())?;
-                let pipeline_id = pipeline
-                    .get("id")
-                    .ok_or("The pipeline does not contain an id".to_string())?;
-                let pipeline_id = pipeline_id
-                    .as_u64()
-                    .ok_or("The id is not an integer".to_string())?;
-                let pipeline_status = pipeline
-                    .get("status")
-                    .ok_or("The pipeline does not contain a status".to_string())?;
-                let pipeline_status = pipeline_status
-                    .as_str()
-                    .ok_or("The status is not a string".to_string())?;
-                let pipeline_url = pipeline
-                    .get("url")
-                    .ok_or("The pipeline does not contain an url".to_string())?;
-                let pipeline_url = pipeline_url
-                    .as_str()
-                    .ok_or("The url is not a string".to_string())?;
-                let message = format!(
-                    "Pipeline #{} {} for {}",
-                    pipeline_id, pipeline_status, project_name
-                );
-                let message_html = format!(
-                    "<h3>Pipeline <a href=\"{}\">#{}</a> {} for <a href=\"{}\">{}</a></h3>",
-                    pipeline_url, pipeline_id, pipeline_status, project_url, project_name
-                );
-                let message = HookshotMessage {
-                    text: message,
-                    html: Some(message_html),
-                    username: None,
-                };
-                message.submit(&self.uri).await
-            }
-            other => Err(format!("Unsupported object_kind: {}", other)),
+        } else {
+            // in case of "Repository update events"...
+            let user = body
+                .get("user_name")
+                .ok_or("The body does not contain a user_name".to_string())?;
+            let user = user
+                .as_str()
+                .ok_or("The user_name is not a string".to_string())?;
+
+            let project = body
+                .get("project")
+                .ok_or("The body does not contain a project".to_string())?;
+            let project = project
+                .as_object()
+                .ok_or("The project is not a JSON object".to_string())?;
+
+            let project_name = project
+                .get("name")
+                .ok_or("The project does not contain a name".to_string())?;
+            let project_name = project_name
+                .as_str()
+                .ok_or("The name is not a string".to_string())?;
+
+            let project_url = project
+                .get("web_url")
+                .ok_or("The project does not contain a web_url".to_string())?;
+            let project_url = project_url
+                .as_str()
+                .ok_or("The web_url is not a string".to_string())?;
+
+            let message = format!("The repository {} was updated by {}", project_name, user);
+            let message_html = format!(
+                "<h3>The repository <a href=\"{}\">{}</a> was updated by {}</h3>",
+                project_url, project_name, user
+            );
+            let message = HookshotMessage {
+                text: message,
+                html: Some(message_html),
+                username: None,
+            };
+            message.submit(&self.uri).await
         }
     }
 }
