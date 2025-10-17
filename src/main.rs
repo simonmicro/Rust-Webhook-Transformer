@@ -1,4 +1,4 @@
-use actix_web::{get, middleware::Logger, route, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, middleware::Logger, route, web};
 use futures::future;
 use log::error;
 use rust_webhook_transformer::transformer::TransformerConfigTypes;
@@ -78,11 +78,8 @@ async fn forward_to_transformers(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    if std::env::var("RUST_LOG").is_err() {
-        // Set log level to info if not otherwise specified
-        std::env::set_var("RUST_LOG", "info");
-    }
-    env_logger::init();
+    // Set log level to info if not otherwise specified
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     // Load config (and just panic if it fails)
     let config: Config = serde_yaml::from_str(
