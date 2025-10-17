@@ -82,7 +82,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     // Load config (and just panic if it fails)
-    let config: Config = serde_yaml::from_str(
+    let config: Config = serde_yaml_bw::from_str(
         std::fs::read_to_string("config.yaml")
             .expect("Failed to open and read the config file")
             .as_str(),

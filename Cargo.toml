@@ -1,6 +1,6 @@
 [package]
 name = "rust-webhook-transformer"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,5 +13,5 @@ log = "0.4.28"
 reqwest = "0.12.24"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-serde_yaml = "0.9.34+deprecated"
+serde_yaml_bw = "2.4.1"
 tokio = "1.48.0"
