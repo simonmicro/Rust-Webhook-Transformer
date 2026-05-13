@@ -1,6 +1,6 @@
 [package]
 name = "rust-webhook-transformer"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,8 +10,8 @@ actix-web = "4.13.0"
 env_logger = "0.11.10"
 futures = "0.3.32"
 log = "0.4.29"
-reqwest = "0.13.2"
+reqwest = "0.13.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-serde_yaml_bw = "2.5.4"
-tokio = "1.50.0"
+serde_yaml_bw = "2.5.6"
+tokio = "1.52.3"
